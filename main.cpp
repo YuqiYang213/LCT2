@@ -47,6 +47,8 @@ void SplitString(const string& s, vector<string>& v, const string& c)
 }
 
 int main() {
+    cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
+
     LCT2tracker tracker;
     //int size[3] = {16, 20};
     string img_root = ".\\David\\img\\";

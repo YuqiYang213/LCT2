@@ -15,6 +15,7 @@
 #include "util.h"
 #include"fhog.h"
 #include "assignToBins1.h"
+#include "detector.h"
 
 const int featuremax= 300;
 
@@ -61,6 +62,9 @@ public:
     //online trainning
     cv::Point train(cv::Mat image);
 
+    //use detector to find pos
+    std::pair<cv::Point, float>  refine_pos(cv::Mat image, int pos_x, int pos_y, bool app);
+
     float padding; //area surrounding the target
     float lambda; //regularization
     float output_sigma_factor; //spatial bandwidth
@@ -102,6 +106,12 @@ public:
     cv::Size scale_model_sz;
     float currentscalefactor;
     float max_scalefactor;
+    float min_scalefactor;
+    float scale_step;
+
+    //detector
+    detector det;
+    float m_response;
 private:
     int size_patch[3];
 };

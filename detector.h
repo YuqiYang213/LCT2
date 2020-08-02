@@ -18,15 +18,19 @@ public:
     cv::Size t_sz;
     int nbin;
     cv::Size target_sz, image_sz;
-    float thresh_p, thresh_n;
     cv::Ptr<cv::ml::SVM> det;
+    cv::Mat w;
+    double b;
 
-    //constructor
-    detector(cv::Size target_sz ,cv::Size image_sz);
+    //intialize the detector
+    void init(cv::Size target_sz ,cv::Size image_sz);
 
     //get the needed featuure
     cv::Mat get_feature(cv::Mat image);
 
     //get the needed feature and label
-    std::pair<cv::Mat, cv::Mat> get_sample(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz);
+    std::vector<cv::Mat> get_sample(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz);
+
+    //train the detector
+    void train(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bool online);
 };

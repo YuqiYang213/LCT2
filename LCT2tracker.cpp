@@ -160,7 +160,7 @@ LCT2tracker::LCT2tracker()
     nScale = 33;
     float scale_sigma_factor = 0.25;
     scale_sigma = nScale/std::sqrt(33)*scale_sigma_factor;
-    float scale_step = 1.02;
+    scale_step = 1.02;
     for(int i = 0; i < nScale; i++)
     {
         scale_factor[i] = std::pow(scale_step, int(ceil(nScale/2.0) - i - 1));
@@ -228,6 +228,28 @@ std::pair<cv::Point, float> LCT2tracker::do_correlation(cv::Mat image, int pos_x
     return std::make_pair<cv::Point, float>(cv::Point(pos_y + maxIdx[1], pos_x + maxIdx[0]), maxVal);
 }
 
+std::pair<cv::Point, float> LCT2tracker::refine_pos(cv::Mat image, int pos_x, int pos_y, bool app) {
+    std::vector<cv::Mat> samples = det.get_sample(image, pos_x, pos_y, cv::Size(window_y, window_x));
+    cv::Mat scores = samples[0] * det.w + det.b;
+    //samples[4] = samples[4].t();
+    scores = scores.mul(samples[4].reshape(1, scores.rows));
+    //std::cout<<scores<<std::endl;
+
+    double minVal, maxVal;
+    int    minIdx[2] = {}, maxIdx[2] = {};
+    cv::minMaxIdx(scores, &minVal, &maxVal, minIdx, maxIdx);
+    cv::Point tpos(samples[3].at<float>(0, maxIdx[0]), samples[2].at<float>(0, maxIdx[0]));
+    //std::cout<<cv::Point(pos_y, pos_x)<<tpos<<" "<<maxVal<<std::endl;
+
+    float max_reponse = do_correlation(image, tpos.y, tpos.x, cv::Size(app_y, app_x), false, app).second;
+    if(max_reponse < 1.5 * m_response || max_reponse < 0)
+    {
+        tpos = cv::Point(pos_y, pos_x);
+        max_reponse = m_response;
+    }
+    return std::make_pair(tpos, max_reponse);
+}
+
 cv::Mat LCT2tracker::gaussian_correlation(const cv::Mat &xf, const cv::Mat &yf, float sigma) {
     cv::Mat c(xf.rows, xf.cols, CV_32F, cv::Scalar(0));
     std::vector<cv::Mat> xfvec, yfvec;
@@ -279,6 +301,7 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     }
     //std::cout<<im_gray.channels()<<std::endl;
     search_window(real_roi.height, real_roi.width, im_gray.rows, im_gray.cols);
+    det.init(real_roi.size(), im_gray.size());
 
     int scale_model_max_area = 512;
     //std::cout<<app_x*app_y<<std::endl;
@@ -288,6 +311,8 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     _roi = real_roi;
     output_sigma = std::sqrt(_roi.area())*output_sigma_factor/cell_size;
 
+    min_scalefactor = std::pow(scale_step, std::ceil(std::log(std::max(5/window_y, 5/window_x)/std::log(scale_step))));
+    max_scalefactor = std::pow(scale_step, std::floor(std::log(std::min(float(im_gray.cols)/_roi.width, float(im_gray.rows)/_roi.height)/std::log(scale_step))));
 
     cv::Mat patch_win = get_subwindow(im_gray, _roi.y, _roi.x, window_x, window_y);
     win_xf = multichafft(get_feature(patch_win, true), false);
@@ -342,6 +367,8 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
         ans.push_back(sf_den_sp.clone());
     }
     cv::merge(ans, sf_den);
+
+    det.train(im_gray, _roi.y, _roi.x, cv::Size(window_y, window_x), false);
 }
 
 cv::Point LCT2tracker::train(cv::Mat Image)
@@ -358,6 +385,12 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     }
     std::pair<cv::Point, float> pos = do_correlation(im_gray, _roi.y, _roi.x, cv::Size(window_y, window_x), true, false);
     std::pair<cv::Point, float> max_response = do_correlation(im_gray, pos.first.y, pos.first.x, cv::Size(app_y, app_x), false, true);
+    this->m_response = std::max(this->m_response, max_response.second);
+
+    //if(max_response.second < motion_thresh)
+    //{
+        pos = max_response = refine_pos(im_gray, pos.first.y, pos.first.x, true);
+    //}
 
     float c_scalefactor[40];
     for(int i = 0; i < nScale; i++)
@@ -397,6 +430,10 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     int    minIdx[2] = {}, maxIdx[2] = {};	// minnimum Index, maximum Index
     cv::minMaxIdx(scale_response, &minVal, &maxVal, minIdx, maxIdx);
     currentscalefactor = c_scalefactor[maxIdx[1]];
+    if(currentscalefactor < min_scalefactor)
+        currentscalefactor = min_scalefactor;
+    else if(currentscalefactor > max_scalefactor)
+        currentscalefactor = max_scalefactor;
     //std::cout<<currentscalefactor<<std::endl;
 
     _roi.x = pos.first.x;
@@ -425,6 +462,7 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     {
         app_xf = (1 - interp_factor)*app_xf + interp_factor*new_app_xf;
         app_alphaf = (1 - interp_factor)* app_alphaf + interp_factor*new_app_alphaf;
+        det.train(im_gray, pos.first.y, pos.first.x, cv::Size(window_y, window_x), true);
     }
 
     float train_scale_factor[40];
@@ -454,7 +492,6 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     cv::Mat new_sf_den;
     cv::merge(ans, new_sf_den);
     sf_den = (1 - interp_factor)*sf_den + interp_factor*new_sf_den;
-
 
     if(resize_image)
         return pos.first*2;
