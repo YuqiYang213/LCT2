@@ -387,10 +387,10 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     std::pair<cv::Point, float> max_response = do_correlation(im_gray, pos.first.y, pos.first.x, cv::Size(app_y, app_x), false, true);
     this->m_response = std::max(this->m_response, max_response.second);
 
-    //if(max_response.second < motion_thresh)
-    //{
+    if(max_response.second < motion_thresh)
+    {
         pos = max_response = refine_pos(im_gray, pos.first.y, pos.first.x, true);
-    //}
+    }
 
     float c_scalefactor[40];
     for(int i = 0; i < nScale; i++)
