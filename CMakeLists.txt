@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(LCT2)
-
 set(CMAKE_CXX_STANDARD 14)
 
 set(OpenCV_DIR "D:\\opencv\\OpenCV-MinGW-Build-OpenCV-4.1.1-x64")

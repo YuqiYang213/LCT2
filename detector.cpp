@@ -26,7 +26,17 @@ void detector::init(cv::Size target_sz, cv::Size image_sz) {
 }
 
 cv::Mat detector::get_feature(cv::Mat image) {
-    int nth = 8;
+    int nth;
+    if(image.channels() == 3)
+    {
+        cv::cvtColor(image, image, cv::COLOR_BGR2Lab);
+        nth = 4;
+        std::vector<cv::Mat> Lab;
+        cv::split(image, Lab);
+        image = Lab[0];
+        //std::cout<<Lab[0]<<std::endl;
+    }
+    else nth = 8;
     int ksize = 4;
     cv::Mat f_iif = 255 - doWork(image, cv::Size(ksize, ksize), nbin);
     std::vector<cv::Mat> ans;
@@ -58,6 +68,7 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
         for(int j = 0; j < weights.cols; j++)
             weights.at<float>(i, j) = std::exp(-0.5*(i*i*1.0 + j*j*1.0)/(25.0*25.0));
     cv::Rect target_rect((feat.cols-t_sz.width)/2, (feat.rows - t_sz.height)/2, t_sz.width, t_sz.height);
+
     int truerow = feat.rows - t_sz.height;int truecol = feat.cols - t_sz.width;int truesta_i = 0;int truesta_j = 0;
     for(int i = 0; i < feat.rows - t_sz.height; i += 1)
     {
@@ -123,7 +134,7 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
 void detector::train(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bool online) {
     std::vector<cv::Mat> samples = get_sample(image, pos_x, pos_y, window_sz);
     //std::cout<<samples[1]<<std::endl;
-    float posi = 0.5, nega = 0.1;
+    float posi = 0.8, nega = 0.3;
     std::vector<cv::Mat> features, labels;
     for(int i = 0; i < samples[0].rows; i++)
     {

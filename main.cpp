@@ -2,25 +2,9 @@
 #include <fstream>
 #include "LCT2tracker.h"
 #include <opencv2/opencv.hpp>
+#include<sstream>
 
 using namespace std;
-
-void printar(cv::Mat tar)
-{
-    for(int k = 0; k < tar.channels();k++)
-    {
-        for(int i = 0; i < tar.rows; i++)
-        {
-            for(int j = 0; j < tar.cols; j++)
-            {
-                float *x = (float *)(tar.data + tar.step[0]*i + tar.step[1]*j + k* sizeof(float));
-                cout<<*x<<" ";
-            }
-            cout<<endl;
-        }
-        cout<<endl;
-    }
-}
 
 string num_2_str(int n)
 {
@@ -30,46 +14,50 @@ string num_2_str(int n)
     return x + ".jpg";
 }
 
-void SplitString(const string& s, vector<string>& v, const string& c)
-{
-    string::size_type pos1, pos2;
-    pos2 = s.find(c);
-    pos1 = 0;
-    while(string::npos != pos2)
-    {
-        v.push_back(s.substr(pos1, pos2-pos1));
-
-        pos1 = pos2 + c.size();
-        pos2 = s.find(c, pos1);
-    }
-    if(pos1 != s.length())
-        v.push_back(s.substr(pos1));
-}
-
-int main() {
-    cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
-
+int main(int argc, char** argv) {
     LCT2tracker tracker;
     //int size[3] = {16, 20};
-    string img_root = ".\\David\\img\\";
-    ifstream fin(".\\David\\groundtruth_rect.txt");
-    for(int i = 299; i <= 770; i++)
+    string img_root;
+    //ifstream fin(".\\David\\groundtruth_rect.txt");
+    cv::Rect gt;
+    vector<cv::Rect> out;
+    int start_frame, end_frame;
+    stringstream ssin;
+    img_root = argv[1];
+
+    ssin<<argv[2];
+    ssin>>start_frame;
+    ssin.clear();
+    ssin<<argv[3];
+    ssin>>end_frame;
+    ssin.clear();
+
+    ssin<<argv[4];
+    ssin>>gt.x;
+    ssin.clear();
+    ssin<<argv[5];
+    ssin>>gt.y;
+    ssin.clear();
+    ssin<<argv[6];
+    ssin>>gt.width;
+    ssin.clear();
+    ssin<<argv[7];
+    ssin>>gt.height;
+    ssin.clear();
+
+
+    string name = argv[8];
+    //ssin>>img_root>>start_frame>>end_frame>>gt.x>>gt.y>>gt.width>>gt.height;
+    cv::Mat image;
+    for(int i = start_frame; i <= end_frame; i++)
     {
-        cout<<i<<endl;
-        cv::Mat image;
+        //cout<<"good"<<endl;
+        //cout<<i<<endl;
+        cv::Rect det;
         image = cv::imread(img_root + num_2_str(i));
-        cv::Rect gt, det;
         cv::Point sit;
-        string in;
-        fin>>in;
-        vector<string> tmp;
-        SplitString(in, tmp, ",");
-        gt.x = atoi(tmp[0].c_str());
-        gt.y = atoi(tmp[1].c_str());
-        gt.width = atoi(tmp[2].c_str());
-        gt.height = atoi(tmp[3].c_str());
         //cout<<gt<<endl;
-        if(i == 299)
+        if(i == start_frame)
         {
             gt.x += gt.width/2;
             gt.y += gt.height/2;
@@ -89,6 +77,7 @@ int main() {
                 det.height = floor(tracker.app_x*tracker.currentscalefactor)*2;
                 det.x -= det.width/2;
                 det.y -= det.height/2;
+                //cout<<tracker.resize_image<<endl;
             }
             else {
                 det.width = floor(tracker.app_y * tracker.currentscalefactor);
@@ -96,14 +85,24 @@ int main() {
                 det.x -= det.width / 2;
                 det.y -= det.height / 2;
             }
-
+            det.width = min(det.width ,image.cols - det.x - 1);
+            det.height = min(det.height, image.rows - det.y - 1);
+            det.x = max(0, det.x);
+            det.y = max(0, det.y);
         }
-        cv::rectangle(image, gt, cv::Scalar(255, 0, 0), 3, cv::LINE_8, 0);
-        cv::rectangle(image, det, cv::Scalar(0, 255, 0), 3, cv::LINE_8, 0);
-        cv::imshow("ans", image);
-        cv::waitKey();
-        image.release();
+        out.push_back(det);
+        //cout<<det<<endl;
+        //cv::rectangle(image, gt, cv::Scalar(255, 0, 0), 3, cv::LINE_8, 0);
+        //cv::rectangle(image, det, cv::Scalar(0, 255, 0), 3, cv::LINE_8, 0);
+        //cv::imshow("ans", image);
+        //cv::waitKey();
     }
+    ofstream fout(name + "_ans.txt",ios::trunc|ios::out|ios::in );
+    for(cv::Rect rec : out)
+    {
+        fout<<rec.x<<" "<<rec.y<<" "<<rec.width<<" "<<rec.height<<endl;
+    }
+    fout.close();
     //cv::waitKey();
     return 0;
 }

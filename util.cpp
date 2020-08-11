@@ -28,10 +28,25 @@ cv::Mat doWork(cv::InputArray _src,cv::Size ksize,int nbins)
 
 cv::Mat get_subwindow(const cv::Mat &image, int x, int y, int size_x, int size_y)
 {
-    cv::Mat paded;
+    //cv::Mat paded;
     //cv::namedWindow("image", 1);
-    cv::copyMakeBorder(image, paded, size_x/2 + 1, size_x/2 + 1, size_y/2 + 1, size_y/2 + 1, cv::BORDER_REPLICATE);
-    return paded(cv::Range(x, x + size_x), cv::Range(y, y + size_y)).clone();
+    //cv::copyMakeBorder(image, paded, size_x/2 + 5, size_x/2 + 5, size_y/2 + 5, size_y/2 + 5, cv::BORDER_REPLICATE);
+    int real_x = std::max(x - size_x/2, 0);
+    int real_y = std::max(y - size_y/2, 0);
+    int real_wid = std::min(size_y, image.cols - real_y) - std::max(size_y/2 - y, 0);
+    int real_hei = std::min(size_x, image.rows - real_x) - std::max(size_x/2 - x, 0);
+    cv::Mat ans = image(cv::Range(real_x, real_x + real_hei), cv::Range(real_y, real_y + real_wid));
+    int top = 0, bottom = 0, left = 0, right = 0;
+    if(real_x == 0)
+        top = size_x/2 - x;
+    if(real_y == 0)
+        left = size_y/2 - y;
+    if(real_hei < size_x)
+        bottom = size_x - real_hei - top;
+    if(real_wid < size_y)
+        right = size_y - real_wid - left;
+    cv::copyMakeBorder(ans, ans, top, bottom, left, right, cv::BORDER_REPLICATE);
+    return ans;
 }
 
 void circshift(cv::Mat &out, const cv::Point &delta)

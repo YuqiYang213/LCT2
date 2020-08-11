@@ -221,11 +221,11 @@ std::pair<cv::Point, float> LCT2tracker::do_correlation(cv::Mat image, int pos_x
     //std::cout<<response<<std::endl;
     cv::minMaxIdx(response, &minVal, &maxVal, minIdx, maxIdx);
 
-    maxIdx[0] = (maxIdx[0] - floor(zf.rows/2.0))*cell_size;
-    maxIdx[1] = (maxIdx[1] - floor(zf.cols/2.0))*cell_size;
+    maxIdx[0] = std::max(int((maxIdx[0] - floor(zf.rows/2.0))*cell_size), -pos_x);
+    maxIdx[1] = std::max(int((maxIdx[1] - floor(zf.cols/2.0))*cell_size), -pos_y);
     //std::cout<<maxVal<<" "<<maxIdx[0]<<" "<<maxIdx[1]<<std::endl;
 
-    return std::make_pair<cv::Point, float>(cv::Point(pos_y + maxIdx[1], pos_x + maxIdx[0]), maxVal);
+    return std::make_pair<cv::Point, float>(cv::Point(std::min(pos_y + maxIdx[1], image.cols - 1), std::min(pos_x + maxIdx[0], image.rows - 1)) ,maxVal);
 }
 
 std::pair<cv::Point, float> LCT2tracker::refine_pos(cv::Mat image, int pos_x, int pos_y, bool app) {
@@ -241,8 +241,11 @@ std::pair<cv::Point, float> LCT2tracker::refine_pos(cv::Mat image, int pos_x, in
     cv::Point tpos(samples[3].at<float>(0, maxIdx[0]), samples[2].at<float>(0, maxIdx[0]));
     //std::cout<<cv::Point(pos_y, pos_x)<<tpos<<" "<<maxVal<<std::endl;
 
-    float max_reponse = do_correlation(image, tpos.y, tpos.x, cv::Size(app_y, app_x), false, app).second;
-    if(max_reponse < 1.5 * m_response || max_reponse < 0)
+    cv::Mat imgray;
+    if(image.channels() >= 3)
+        cv::cvtColor(image, imgray, cv::COLOR_BGR2GRAY);
+    float max_reponse = do_correlation(imgray, tpos.y, tpos.x, cv::Size(app_y, app_x), false, app).second;
+    if(max_reponse < appearance_thresh || max_reponse < 0)
     {
         tpos = cv::Point(pos_y, pos_x);
         max_reponse = m_response;
@@ -253,8 +256,8 @@ std::pair<cv::Point, float> LCT2tracker::refine_pos(cv::Mat image, int pos_x, in
 cv::Mat LCT2tracker::gaussian_correlation(const cv::Mat &xf, const cv::Mat &yf, float sigma) {
     cv::Mat c(xf.rows, xf.cols, CV_32F, cv::Scalar(0));
     std::vector<cv::Mat> xfvec, yfvec;
-    cv::split(xf, xfvec);
-    cv::split(yf, yfvec);
+    cv::split(xf.clone(), xfvec);
+    cv::split(yf.clone(), yfvec);
     cv::Mat caux;
     cv::Scalar xx = 0, yy = 0;
     std::vector<cv::Mat> xtmp, ytmp, ctmp;
@@ -286,21 +289,21 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     resize_image = (roi.width * roi.height > 10000);
     cv::Mat im_gray;
     if(Image.channels() == 3)
-         cv::cvtColor(Image, im_gray, cv::COLOR_RGB2GRAY);
+         cv::cvtColor(Image, im_gray, cv::COLOR_BGR2GRAY);
     else
         im_gray = Image.clone();
     cv::Rect real_roi = roi;
     if(resize_image)
     {
         cv::resize(Image, Image, cv::Size(Image.cols/2, Image.rows/2));
-        cv::resize(im_gray, im_gray, cv::Size(Image.cols/2, Image.rows/2));
+        cv::resize(im_gray, im_gray, cv::Size(im_gray.cols/2, im_gray.rows/2));
         real_roi.height /= 2;
         real_roi.width /= 2;
         real_roi.x/=2;
         real_roi.y /=2;
     }
-    //std::cout<<im_gray.channels()<<std::endl;
     search_window(real_roi.height, real_roi.width, im_gray.rows, im_gray.cols);
+    //std::cout<<window_x<<" "<<window_y<<std::endl;
     det.init(real_roi.size(), im_gray.size());
 
     int scale_model_max_area = 512;
@@ -314,6 +317,7 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     min_scalefactor = std::pow(scale_step, std::ceil(std::log(std::max(5/window_y, 5/window_x)/std::log(scale_step))));
     max_scalefactor = std::pow(scale_step, std::floor(std::log(std::min(float(im_gray.cols)/_roi.width, float(im_gray.rows)/_roi.height)/std::log(scale_step))));
 
+    //std::cout<<window_x<<" "<<window_y<<std::endl;
     cv::Mat patch_win = get_subwindow(im_gray, _roi.y, _roi.x, window_x, window_y);
     win_xf = multichafft(get_feature(patch_win, true), false);
     tar = multichafft(create_gaussian_label(output_sigma,size_patch[1], size_patch[0]), false);
@@ -354,7 +358,6 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     cv::mulSpectrums(scale_tar, xsf, sf_num, 0, true);
 
 
-
     cv::Mat sf_den_ori;
     cv::mulSpectrums(xsf, xsf, sf_den_ori, 0, true);
     tmp.clear();
@@ -367,29 +370,29 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
         ans.push_back(sf_den_sp.clone());
     }
     cv::merge(ans, sf_den);
-
-    det.train(im_gray, _roi.y, _roi.x, cv::Size(window_y, window_x), false);
+    det.train(Image.clone(), _roi.y, _roi.x, cv::Size(window_y, window_x), false);
 }
 
 cv::Point LCT2tracker::train(cv::Mat Image)
 {
     cv::Mat im_gray;
     if(Image.channels() == 3)
-        cv::cvtColor(Image, im_gray, cv::COLOR_RGB2GRAY);
+        cv::cvtColor(Image, im_gray, cv::COLOR_BGR2GRAY);
     else
         im_gray = Image.clone();
     if(resize_image)
     {
         cv::resize(Image, Image, cv::Size(Image.cols/2, Image.rows/2));
-        cv::resize(im_gray, im_gray, cv::Size(Image.cols/2, Image.rows/2));
+        cv::resize(im_gray, im_gray, cv::Size(im_gray.cols/2, im_gray.rows/2));
     }
     std::pair<cv::Point, float> pos = do_correlation(im_gray, _roi.y, _roi.x, cv::Size(window_y, window_x), true, false);
     std::pair<cv::Point, float> max_response = do_correlation(im_gray, pos.first.y, pos.first.x, cv::Size(app_y, app_x), false, true);
+    //std::cout<<max_response.second<<std::endl;
     this->m_response = std::max(this->m_response, max_response.second);
 
     if(max_response.second < motion_thresh)
     {
-        pos = max_response = refine_pos(im_gray, pos.first.y, pos.first.x, true);
+        pos = max_response = refine_pos(Image, pos.first.y, pos.first.x, true);
     }
 
     float c_scalefactor[40];
@@ -462,7 +465,7 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     {
         app_xf = (1 - interp_factor)*app_xf + interp_factor*new_app_xf;
         app_alphaf = (1 - interp_factor)* app_alphaf + interp_factor*new_app_alphaf;
-        det.train(im_gray, pos.first.y, pos.first.x, cv::Size(window_y, window_x), true);
+        det.train(Image.clone(), pos.first.y, pos.first.x, cv::Size(window_y, window_x), true);
     }
 
     float train_scale_factor[40];
@@ -511,11 +514,9 @@ cv::Mat LCT2tracker::get_scale_sample(const cv::Mat &image, cv::Rect base_target
         cv::resize(patch, resized, model_sz);
         cv::Mat feature = fhog(resized, 4);
         cv::split(feature, tmp);
-        tmp[31].release();
         tmp.pop_back();
         //std::cout<<tmp.size()<<std::endl;
         cv::merge(tmp, feature);
-        tmp.clear();
         cv::Mat feature_re = feature.reshape(1, 1);
         if(window)
         {
