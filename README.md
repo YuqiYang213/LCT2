@@ -17,4 +17,19 @@ Windows10
 
 ## Demo:
 
-We use the dataset David from OTB as the demo to test our program. To run it, you have to first download the David Datasets from http://cvlab.hanyang.ac.kr/tracker_benchmark/datasets.html , and put it in the code folder. Then , you can just simply build and run the main.cpp without inputing anything and then you can see a sequence of pictures with two rectangles on it that the green one indicates our methods' result and the blue one indicates the groundtruth.
+We use the dataset from OTB as the demo to test our program. To test it, you have to first download the OTB Datasets from http://cvlab.hanyang.ac.kr/tracker_benchmark/datasets.html .  Then, you can run the program after building it with mingw by typing command like:
+
+>LCT2.exe d:\data_seq\Car4\img\ 1 659 58 50 107 87 car4
+
+Here, the first parameter indicates where the OTB images are saved. The second parameter and the third parameters are the beginning frame and the last frame to track. The following four parameters define the initial rectangle, which is given in this way:
+
+>x y width height
+
+You can use the first rectangle in **groundtruth_rect.txt** . Not that the x and y should minus **one**. The last paramter indicates the name for output text. After running it, you can have a text named as:
+
+>name_ans.txt
+
+as the tracking result. Note that the first rectangle in name_ans.txt is always the groundtruth.
+
+## Test result
+under construction
