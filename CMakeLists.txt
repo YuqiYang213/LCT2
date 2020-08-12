@@ -9,5 +9,5 @@ find_package(OpenCV REQUIRED)
 
 include_directories( ${OpenCV_INCLUDE_DIRS})
 
-add_executable(LCT2 main.cpp LCT2tracker.h LCT2tracker.cpp fhog.h fhog.cpp assignToBins1.cpp assignToBins1.h detector.h util.h detector.cpp util.cpp)
+add_executable(LCT2 main.cpp LCT2tracker.h LCT2tracker.cpp assignToBins1.cpp assignToBins1.h detector.h util.h detector.cpp util.cpp fhog.cpp fhog.h)
 target_link_libraries(LCT2 ${OpenCV_LIBS})

@@ -35,7 +35,7 @@ cv::Mat get_subwindow(const cv::Mat &image, int x, int y, int size_x, int size_y
     int real_y = std::max(y - size_y/2, 0);
     int real_wid = std::min(size_y, image.cols - real_y) - std::max(size_y/2 - y, 0);
     int real_hei = std::min(size_x, image.rows - real_x) - std::max(size_x/2 - x, 0);
-    cv::Mat ans = image(cv::Range(real_x, real_x + real_hei), cv::Range(real_y, real_y + real_wid));
+    cv::Mat ans = image(cv::Range(real_x, real_x + real_hei), cv::Range(real_y, real_y + real_wid)).clone();
     int top = 0, bottom = 0, left = 0, right = 0;
     if(real_x == 0)
         top = size_x/2 - x;

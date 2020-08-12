@@ -25,15 +25,16 @@ void detector::init(cv::Size target_sz, cv::Size image_sz) {
     det = cv::ml::SVM::create();
 }
 
-cv::Mat detector::get_feature(cv::Mat image) {
+cv::Mat detector::get_feature(cv::Mat image_o) {
     int nth;
+    cv::Mat image = image_o.clone();
     if(image.channels() == 3)
     {
         cv::cvtColor(image, image, cv::COLOR_BGR2Lab);
         nth = 4;
         std::vector<cv::Mat> Lab;
         cv::split(image, Lab);
-        image = Lab[0];
+        image = Lab[0].clone();
         //std::cout<<Lab[0]<<std::endl;
     }
     else nth = 8;
@@ -61,9 +62,9 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
     cv::resize(feat, feat, cv::Size(ceil(feat.cols*ratio), ceil(feat.rows*ratio)), 0, 0, cv::INTER_NEAREST);
 
     std::vector<cv::Mat> alfeat;
-    cv::Mat label(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F);
-    cv::Mat yy(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F), xx(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F);
-    cv::Mat weights(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F);
+    cv::Mat label(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F, cv::Scalar::all(0));
+    cv::Mat yy(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F), xx(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F, cv::Scalar::all(0));
+    cv::Mat weights(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F, cv::Scalar::all(0));
     for(int i = 0; i < weights.rows; i++)
         for(int j = 0; j < weights.cols; j++)
             weights.at<float>(i, j) = std::exp(-0.5*(i*i*1.0 + j*j*1.0)/(25.0*25.0));
@@ -111,7 +112,7 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
     xx = xx(cv::Range(truesta_i, truesta_i + truerow), cv::Range(truesta_j, truesta_j + truecol)).clone().reshape(1, 1);
     yy = yy(cv::Range(truesta_i, truesta_i + truerow), cv::Range(truesta_j, truesta_j + truecol)).clone().reshape(1, 1);
     weights = weights(cv::Range(truesta_i, truesta_i + truerow), cv::Range(truesta_j, truesta_j + truecol)).clone();
-    cv::Mat feature(alfeat.size(), alfeat[0].cols, CV_32F);
+    cv::Mat feature(alfeat.size(), alfeat[0].cols, CV_32F, cv::Scalar::all(0));
     for(int i = 0; i < alfeat.size(); i++)
     {
         cv::Mat tmp;
@@ -132,28 +133,30 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
 }
 
 void detector::train(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bool online) {
+    //std::cout<<"de"<<std::endl;
     std::vector<cv::Mat> samples = get_sample(image, pos_x, pos_y, window_sz);
     //std::cout<<samples[1]<<std::endl;
     float posi = 0.8, nega = 0.3;
-    std::vector<cv::Mat> features, labels;
+    std::vector<cv::Mat> features;
+    std::vector<int> labels;
     for(int i = 0; i < samples[0].rows; i++)
     {
         if(samples[1].at<float>(0, i) > posi)
         {
-            labels.push_back(cv::Mat(1, 1, CV_32F, cv::Scalar::all(1)));
+            labels.push_back(1);
             features.push_back(samples[0].row(i).clone());
         }
         else if(samples[1].at<float>(0, i) < nega)
         {
-            labels.push_back(cv::Mat(1, 1, CV_32F, cv::Scalar::all(-1)));
+            labels.push_back(-1);
             features.push_back(samples[0].row(i).clone());
         }
     }
-    cv::Mat feat(features.size(), features[0].cols, CV_32F), labe(1, features.size(), CV_32S);
+    cv::Mat feat(features.size(), features[0].cols, CV_32F, cv::Scalar::all(0)), labe(1, features.size(), CV_32S, cv::Scalar::all(0));
     for(int i = 0; i < features.size(); i++)
     {
         features[i].copyTo(feat.row(i));
-        labe.at<int>(0, i) = labels[i].at<float>(0, 0);
+        labe.at<int>(0, i) = labels[i];
     }
     if(!online)
     {

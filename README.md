@@ -15,7 +15,7 @@ Windows10
 
 2. Download the opencv 4.1.1 source code, build it with the mingw above. You can use cmake for convinience. Or you can download the built opencv from https://github.com/huihut/OpenCV-MinGW-Build . Add its /bin to the environment variable PATH.
 
-## Demo:
+## Test:
 
 We use the dataset from OTB as the demo to test our program. To test it, you have to first download the OTB Datasets from http://cvlab.hanyang.ac.kr/tracker_benchmark/datasets.html .  Then, you can run the program after building it with mingw by typing command like:
 
@@ -30,6 +30,3 @@ You can use the first rectangle in **groundtruth_rect.txt** . Not that the x and
 >name_ans.txt
 
 as the tracking result. Note that the first rectangle in name_ans.txt is always the groundtruth.
-
-## Test result
-under construction

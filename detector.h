@@ -26,7 +26,7 @@ public:
     void init(cv::Size target_sz ,cv::Size image_sz);
 
     //get the needed featuure
-    cv::Mat get_feature(cv::Mat image);
+    cv::Mat get_feature(cv::Mat image_o);
 
     //get the needed feature and label
     std::vector<cv::Mat> get_sample(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz);

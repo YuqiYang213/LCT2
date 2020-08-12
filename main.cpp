@@ -14,7 +14,7 @@ string num_2_str(int n)
     return x + ".jpg";
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     LCT2tracker tracker;
     //int size[3] = {16, 20};
     string img_root;
@@ -48,13 +48,13 @@ int main(int argc, char** argv) {
 
     string name = argv[8];
     //ssin>>img_root>>start_frame>>end_frame>>gt.x>>gt.y>>gt.width>>gt.height;
-    cv::Mat image;
     for(int i = start_frame; i <= end_frame; i++)
     {
+        cv::Mat image;
         //cout<<"good"<<endl;
         //cout<<i<<endl;
         cv::Rect det;
-        image = cv::imread(img_root + num_2_str(i));
+        image = cv::imread(img_root + num_2_str(i)).clone();
         cv::Point sit;
         //cout<<gt<<endl;
         if(i == start_frame)
@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
         //cv::rectangle(image, gt, cv::Scalar(255, 0, 0), 3, cv::LINE_8, 0);
         //cv::rectangle(image, det, cv::Scalar(0, 255, 0), 3, cv::LINE_8, 0);
         //cv::imshow("ans", image);
-        //cv::waitKey();
+        //cv::waitKey(10);
     }
     ofstream fout(name + "_ans.txt",ios::trunc|ios::out|ios::in );
     for(cv::Rect rec : out)

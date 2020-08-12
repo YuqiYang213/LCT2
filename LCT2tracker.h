@@ -55,7 +55,7 @@ public:
     cv::Mat gaussian_correlation(const cv::Mat &xf, const cv::Mat &yf, float sigma);
 
     //get the scaled sample
-    cv::Mat get_scale_sample(const cv::Mat &image, cv::Rect base_target, float *scale_factor, cv::Size model_sz, bool window);
+    cv::Mat get_scale_sample(const cv::Mat &image, cv::Rect base_target,const float *scale_factor, cv::Size model_sz, bool window);
 
     std::pair<cv::Point, float> do_correlation(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bool window, bool app);
 

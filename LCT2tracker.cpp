@@ -11,9 +11,9 @@ cv::Mat real(const cv::Mat &img)
     cv::Mat ans;
     cv::split(img, planes);
     for(int i = 0; i < planes.size(); i+= 2)
-        out.push_back(planes[i]);
+        out.push_back(planes[i].clone());
     cv::merge(out, ans);
-    return ans;
+    return ans.clone();
 }
 cv::Mat conj(const cv::Mat &img)
 {
@@ -41,7 +41,7 @@ cv::Mat complexMultiplication(const cv::Mat& a, const cv::Mat &b, bool conj = fa
     cv::Mat ans;
     cv::merge(pres, ans);
 
-    return ans;
+    return ans.clone();
 }
 
 cv::Mat complexDivisionReal(const cv::Mat &a, const cv::Mat& b)
@@ -77,7 +77,7 @@ cv::Mat complexDivision(const cv::Mat& a, const cv::Mat &b)
 
     cv::Mat ans;
     cv::merge(pres, ans);
-    return ans;
+    return ans.clone();
 }
 
 
@@ -107,7 +107,7 @@ cv::Mat multichafft(const cv::Mat &input, bool inverse)
             }
             cv::Mat ans;
             cv::merge(ansvec, ans);
-            return ans;
+            return ans.clone();
         }
         for(int i = 0; i < inputvec.size(); i+=2)
         {
@@ -122,7 +122,7 @@ cv::Mat multichafft(const cv::Mat &input, bool inverse)
         }
         cv::Mat ans;
         cv::merge(ansvec, ans);
-        return ans;
+        return ans.clone();
     }
     else
     {
@@ -135,7 +135,7 @@ cv::Mat multichafft(const cv::Mat &input, bool inverse)
         }
         cv::Mat ans;
         cv::merge(inputvec, ans);
-        return ans;
+        return ans.clone();
     }
 }
 
@@ -194,7 +194,7 @@ cv::Mat LCT2tracker::create_gaussian_label(float sigma, int col, int row) {
             ans.at<float>(i, j) = std::exp(-0.5/(sigma*sigma)*((i - row/2)*(i - row/2) + (j - col/2)*(j - col/2)));
         }
     circshift(ans, cv::Point(-col/2, -row/2));
-    return ans;
+    return ans.clone();
 }
 
 
@@ -229,10 +229,10 @@ std::pair<cv::Point, float> LCT2tracker::do_correlation(cv::Mat image, int pos_x
 }
 
 std::pair<cv::Point, float> LCT2tracker::refine_pos(cv::Mat image, int pos_x, int pos_y, bool app) {
-    std::vector<cv::Mat> samples = det.get_sample(image, pos_x, pos_y, cv::Size(window_y, window_x));
+    std::vector<cv::Mat> samples = det.get_sample(image.clone(), pos_x, pos_y, cv::Size(window_y, window_x));
     cv::Mat scores = samples[0] * det.w + det.b;
     //samples[4] = samples[4].t();
-    scores = scores.mul(samples[4].reshape(1, scores.rows));
+    scores = scores.mul(samples[4].reshape(1, scores.rows).clone());
     //std::cout<<scores<<std::endl;
 
     double minVal, maxVal;
@@ -244,6 +244,7 @@ std::pair<cv::Point, float> LCT2tracker::refine_pos(cv::Mat image, int pos_x, in
     cv::Mat imgray;
     if(image.channels() >= 3)
         cv::cvtColor(image, imgray, cv::COLOR_BGR2GRAY);
+    else imgray = image.clone();
     float max_reponse = do_correlation(imgray, tpos.y, tpos.x, cv::Size(app_y, app_x), false, app).second;
     if(max_reponse < appearance_thresh || max_reponse < 0)
     {
@@ -258,11 +259,11 @@ cv::Mat LCT2tracker::gaussian_correlation(const cv::Mat &xf, const cv::Mat &yf, 
     std::vector<cv::Mat> xfvec, yfvec;
     cv::split(xf.clone(), xfvec);
     cv::split(yf.clone(), yfvec);
-    cv::Mat caux;
     cv::Scalar xx = 0, yy = 0;
     std::vector<cv::Mat> xtmp, ytmp, ctmp;
     for(int i = 0; i < xfvec.size(); i+=2)
     {
+        cv::Mat caux;
         xtmp.push_back(xfvec[i].clone());xtmp.push_back(xfvec[i + 1].clone());
         ytmp.push_back(yfvec[i].clone());ytmp.push_back(yfvec[i + 1].clone());
         cv::Mat xft, yft;
@@ -281,7 +282,7 @@ cv::Mat LCT2tracker::gaussian_correlation(const cv::Mat &xf, const cv::Mat &yf, 
     cv::max(((xx[0] + xx[1])/(xf.cols*xf.rows)  + (yy[0] + yy[1])/(xf.cols*xf.rows) - 2 * c)/float(xf.cols*xf.rows*xf.channels()/2), 0, d);
     cv::Mat k;
     cv::exp((-d / (sigma*sigma)), k);
-    return multichafft(k, false);
+    return multichafft(k, false).clone();
 }
 
 void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
@@ -327,7 +328,7 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     cv::split(domini, tmp);
     tmp[0] += lambda;
     cv::merge(tmp, domini);
-    _alphaf = complexDivision(tar, domini);
+    _alphaf = complexDivision(tar, domini).clone();
 
 
     cv::Mat patch_app = get_subwindow(im_gray,_roi.y, _roi.x, app_x, app_y);
@@ -339,7 +340,7 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     cv::split(domini, tmp);
     tmp[0] += lambda;
     cv::merge(tmp, domini);
-    app_alphaf = complexDivision(app_tar, domini);
+    app_alphaf = complexDivision(app_tar, domini).clone();
 
     cv::Mat xs = get_scale_sample(im_gray, cv::Rect(_roi.x, _roi.y, app_y, app_x), scale_factor, scale_model_sz, true);
     //std::cout<<xs<<std::endl;
@@ -363,9 +364,9 @@ void LCT2tracker::init(const cv::Rect &roi, cv::Mat Image)
     tmp.clear();
     std::vector<cv::Mat>  ans;
     cv::split(sf_den_ori, tmp);
-    cv::Mat sf_den_sp;
     for(int i = 0; i < tmp.size(); i++)
     {
+        cv::Mat sf_den_sp;
         cv::reduce(tmp[i], sf_den_sp, 0, cv::REDUCE_SUM);
         ans.push_back(sf_den_sp.clone());
     }
@@ -388,12 +389,14 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     std::pair<cv::Point, float> pos = do_correlation(im_gray, _roi.y, _roi.x, cv::Size(window_y, window_x), true, false);
     std::pair<cv::Point, float> max_response = do_correlation(im_gray, pos.first.y, pos.first.x, cv::Size(app_y, app_x), false, true);
     //std::cout<<max_response.second<<std::endl;
+
     this->m_response = std::max(this->m_response, max_response.second);
 
     if(max_response.second < motion_thresh)
     {
-        pos = max_response = refine_pos(Image, pos.first.y, pos.first.x, true);
+        pos = max_response = refine_pos(Image.clone(), pos.first.y, pos.first.x, true);
     }
+
 
     float c_scalefactor[40];
     for(int i = 0; i < nScale; i++)
@@ -407,9 +410,10 @@ cv::Point LCT2tracker::train(cv::Mat Image)
 
     std::vector<cv::Mat> tmp, out;
     cv::split(sc_response, tmp);
-    cv::Mat sum_sc_response_sp, sum_sc_response;
+    cv::Mat sum_sc_response;
     for(int i = 0; i < tmp.size(); i++)
     {
+        cv::Mat sum_sc_response_sp;
         cv::reduce(tmp[i], sum_sc_response_sp, 0, cv::REDUCE_SUM);
         out.push_back(sum_sc_response_sp.clone());
     }
@@ -424,10 +428,12 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     cv::merge(tmp, denomi);
     sum_sc_response = complexDivision(sum_sc_response, denomi);
 
+
     cv::Mat i_sum_sc_response;
     cv::idft(sum_sc_response, i_sum_sc_response, cv::DFT_ROWS | cv::DFT_COMPLEX_OUTPUT);
     cv::Mat scale_response = real(i_sum_sc_response);
     //std::cout<<scale_response<<std::endl;
+
 
     double minVal, maxVal;
     int    minIdx[2] = {}, maxIdx[2] = {};	// minnimum Index, maximum Index
@@ -468,6 +474,7 @@ cv::Point LCT2tracker::train(cv::Mat Image)
         det.train(Image.clone(), pos.first.y, pos.first.x, cv::Size(window_y, window_x), true);
     }
 
+    //std::cout<<"de_fin"<<std::endl;
     float train_scale_factor[40];
     //std::cout<<currentscalefactor<<std::endl;
     for(int i = 0; i < nScale; i++)
@@ -480,39 +487,37 @@ cv::Point LCT2tracker::train(cv::Mat Image)
     cv::mulSpectrums(scale_tar, xsf, new_sf_num, 0, true);
     sf_num = (1 - interp_factor)*sf_num + interp_factor*new_sf_num;
 
-
     cv::Mat sf_den_ori;
     cv::mulSpectrums(xsf, xsf, sf_den_ori, 0, true);
     tmp.clear();
     std::vector<cv::Mat>  ans;
     cv::split(sf_den_ori, tmp);
-    cv::Mat sf_den_sp;
     for(int i = 0; i < tmp.size(); i++)
     {
+        cv::Mat sf_den_sp;
         cv::reduce(tmp[i], sf_den_sp, 0, cv::REDUCE_SUM);
         ans.push_back(sf_den_sp.clone());
     }
     cv::Mat new_sf_den;
     cv::merge(ans, new_sf_den);
     sf_den = (1 - interp_factor)*sf_den + interp_factor*new_sf_den;
-
     if(resize_image)
         return pos.first*2;
     else return pos.first;
 }
 
-cv::Mat LCT2tracker::get_scale_sample(const cv::Mat &image, cv::Rect base_target, float *scale_factor,
+cv::Mat LCT2tracker::get_scale_sample(const cv::Mat &image, cv::Rect base_target,const float *c_scale_factor,
                                       cv::Size model_sz, bool window = true) {
     std::vector<cv::Mat> tmp;
-    cv::Mat ans(nScale, floor(model_sz.width/float(4)) * floor(model_sz.height/float(4))*31, CV_32F);
+    cv::Mat ans(nScale, floor(model_sz.width/float(4)) * floor(model_sz.height/float(4))*31, CV_32F, cv::Scalar::all(0));
     for(int i = 0; i < nScale; i++)
     {
-        int sh = floor(base_target.height * scale_factor[i]);
-        int sw = floor(base_target.width * scale_factor[i]);
+        int sh = floor(base_target.height * c_scale_factor[i]);
+        int sw = floor(base_target.width * c_scale_factor[i]);
         cv::Mat patch = get_subwindow(image, base_target.y, base_target.x, sh, sw);
         cv::Mat resized;
         cv::resize(patch, resized, model_sz);
-        cv::Mat feature = fhog(resized, 4);
+        cv::Mat feature = fhog::fhog(resized, 4);
         cv::split(feature, tmp);
         tmp.pop_back();
         //std::cout<<tmp.size()<<std::endl;
@@ -536,11 +541,12 @@ cv::Mat LCT2tracker::get_feature(const cv::Mat &raw_image, bool hann)
 
     //hog feature
     cv::Mat image = raw_image.clone();
-    cv::Mat h1 = fhog(image, cell_size, hog_orientations);
+    cv::Mat h1 = fhog::fhog(image, cell_size);
     std::vector<cv::Mat> h1_features;
     cv::split(h1, h1_features);
     for(int i = 0; i < h1_features.size() - 1; i++)
         features.push_back(h1_features[i].clone());
+    image.release();
 
     //hoi feature
     raw_image.convertTo(image, CV_32F);
@@ -558,12 +564,13 @@ cv::Mat LCT2tracker::get_feature(const cv::Mat &raw_image, bool hann)
             }
         features.push_back(h2_resized.clone());
     }
+    image.release();
 
     //hoi iif feature
     cv::Mat iif_image = 255 - doWork(raw_image, cv::Size(cell_size, cell_size), 32);
     iif_image.convertTo(image, CV_32F);
-    cv::Mat h3 = hoi(image, nbins, window_size);
-    cv::Mat h3_all = hoi(h3, nbins, window_size);
+    cv::Mat h3_o = hoi(image, nbins, window_size);
+    cv::Mat h3_all = hoi(h3_o, nbins, window_size);
     std::vector<cv::Mat> split_h3;
     cv::split(h3_all, split_h3);
     for(int k = 0; k < split_h3.size(); k++)
@@ -586,7 +593,6 @@ cv::Mat LCT2tracker::get_feature(const cv::Mat &raw_image, bool hann)
         for(int i = 0; i < features.size(); i++)
             features[i] = features[i].mul(hann_map);
     }
-    //std::cout<<features.size()<<std::endl;
     cv::merge(features, ans);
     return ans.clone();
 
