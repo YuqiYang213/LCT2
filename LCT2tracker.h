@@ -33,11 +33,8 @@ public:
     //Constructor
     LCT2tracker();
 
-    //run the tracker
+    //initialize the tracker
     void init(const cv::Rect &roi, cv::Mat Image);
-
-    //get the new position
-    //cv::Rect eval(cv::Mat Image);
 
     //get the feature
     cv::Mat get_feature(const cv::Mat &Image, bool hann);
@@ -51,7 +48,7 @@ public:
     //create a gaussian Peak
     cv::Mat create_gaussian_label(float sigma, int col, int row);
 
-    //do the gaussian correlation
+    //do the gaussian correlation, get the kernelized function
     cv::Mat gaussian_correlation(const cv::Mat &xf, const cv::Mat &yf, float sigma);
 
     //get the scaled sample
@@ -59,8 +56,8 @@ public:
 
     std::pair<cv::Point, float> do_correlation(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bool window, bool app);
 
-    //online trainning
-    cv::Point train(cv::Mat image);
+    //online trainning and detection
+    cv::Point detect(cv::Mat image);
 
     //use detector to find pos
     std::pair<cv::Point, float>  refine_pos(cv::Mat image, int pos_x, int pos_y, bool app);
@@ -69,6 +66,7 @@ public:
     float lambda; //regularization
     float output_sigma_factor; //spatial bandwidth
     float interp_factor;
+    float scale_inter;
     float kernal_sigma;
     bool resize_image;
     int window_x;int window_y;//size of the motion window

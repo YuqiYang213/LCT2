@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
         //cout<<"good"<<endl;
         //cout<<i<<endl;
         cv::Rect det;
-        image = cv::imread(img_root + num_2_str(i)).clone();
+        image = cv::imread(img_root + num_2_str(i));
         cv::Point sit;
         //cout<<gt<<endl;
         if(i == start_frame)
@@ -69,19 +69,19 @@ int main(int argc, char **argv) {
         else
         {
 
-            sit = tracker.train(image);
+            sit = tracker.detect(image);
             det.x = sit.x;det.y = sit.y;
             if(tracker.resize_image)
             {
-                det.width = floor(tracker.app_y*tracker.currentscalefactor)*2;
-                det.height = floor(tracker.app_x*tracker.currentscalefactor)*2;
+                det.width = floor(tracker._roi.width*tracker.currentscalefactor)*2;
+                det.height = floor(tracker._roi.height*tracker.currentscalefactor)*2;
                 det.x -= det.width/2;
                 det.y -= det.height/2;
                 //cout<<tracker.resize_image<<endl;
             }
             else {
-                det.width = floor(tracker.app_y * tracker.currentscalefactor);
-                det.height = floor(tracker.app_x * tracker.currentscalefactor);
+                det.width = floor(tracker._roi.width * tracker.currentscalefactor);
+                det.height = floor(tracker._roi.height * tracker.currentscalefactor);
                 det.x -= det.width / 2;
                 det.y -= det.height / 2;
             }

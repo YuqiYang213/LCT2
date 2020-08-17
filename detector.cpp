@@ -27,29 +27,35 @@ void detector::init(cv::Size target_sz, cv::Size image_sz) {
 
 cv::Mat detector::get_feature(cv::Mat image_o) {
     int nth;
-    cv::Mat image = image_o.clone();
+    cv::Mat image = image_o.clone(), f;
     if(image.channels() == 3)
     {
         cv::cvtColor(image, image, cv::COLOR_BGR2Lab);
         nth = 4;
         std::vector<cv::Mat> Lab;
         cv::split(image, Lab);
-        image = Lab[0].clone();
-        //std::cout<<Lab[0]<<std::endl;
+        f = Lab[0].clone();
     }
-    else nth = 8;
+    else {
+        nth = 8;
+        f = image.clone();
+    }
     int ksize = 4;
-    cv::Mat f_iif = 255 - doWork(image, cv::Size(ksize, ksize), nbin);
-    std::vector<cv::Mat> ans;
+    cv::Mat f_iif = 255 - doWork(f, cv::Size(ksize, ksize), nbin);
+    std::vector<cv::Mat> ans, tmp;
+    cv::split(image, tmp);
     for(int i = 1; i <= nth; i++)
     {
         float thr = i/float(nth + 1)*255;
         ans.push_back(f_iif >= thr);
     }
-    for(int i = 1; i <= nth; i++)
+    for(int k = 0; k < tmp.size(); k++)
     {
-        float thr = i/float(nth + 1)*255;
-        ans.push_back(image >= thr);
+        for(int i = 1; i <= nth; i++)
+        {
+            float thr = i/float(nth + 1)*255;
+            ans.push_back(tmp[k] >= thr);
+        }
     }
     cv::Mat out;
     cv::merge(ans, out);
@@ -58,6 +64,8 @@ cv::Mat detector::get_feature(cv::Mat image_o) {
 
 std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz) {
     cv::Mat w_area = get_subwindow(image, pos_x, pos_y, floor(window_sz.height*1.2), floor(window_sz.width*1.2));
+    //cv::imshow("in", w_area);
+    //cv::waitKey();
     cv::Mat feat = get_feature(w_area);
     cv::resize(feat, feat, cv::Size(ceil(feat.cols*ratio), ceil(feat.rows*ratio)), 0, 0, cv::INTER_NEAREST);
 
@@ -67,13 +75,15 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
     cv::Mat weights(feat.rows - t_sz.height, feat.cols - t_sz.width, CV_32F, cv::Scalar::all(0));
     for(int i = 0; i < weights.rows; i++)
         for(int j = 0; j < weights.cols; j++)
-            weights.at<float>(i, j) = std::exp(-0.5*(i*i*1.0 + j*j*1.0)/(25.0*25.0));
+            weights.at<float>(i, j) = std::exp(-0.5*((i - weights.rows/2)*(i - weights.rows/2) + (j - weights.cols/2)*(j - weights.cols/2))/(25.0));
+    float re = cv::sum(weights)[0];
+    //std::cout<<weights<<std::endl;
     cv::Rect target_rect((feat.cols-t_sz.width)/2, (feat.rows - t_sz.height)/2, t_sz.width, t_sz.height);
 
     int truerow = feat.rows - t_sz.height;int truecol = feat.cols - t_sz.width;int truesta_i = 0;int truesta_j = 0;
     for(int i = 0; i < feat.rows - t_sz.height; i += 1)
     {
-        if((i + t_sz.height/2 -feat.rows/2)/ratio + pos_x < 0)
+        if((i + t_sz.height/2 - feat.rows/2)/ratio + pos_x < 0)
         {
             truesta_i++;truerow--;
             continue;
@@ -106,7 +116,6 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
             yy.at<float>(i, j) = j;
         }
     }
-    label = label(cv::Range(truesta_i, truesta_i + truerow), cv::Range(truesta_j, truesta_j + truecol)).clone();
     xx = (xx + t_sz.height/2 - feat.rows/2)/ratio + pos_x;
     yy = (yy + t_sz.width/2 - feat.cols/2)/ratio + pos_y;
     xx = xx(cv::Range(truesta_i, truesta_i + truerow), cv::Range(truesta_j, truesta_j + truecol)).clone().reshape(1, 1);
@@ -118,9 +127,9 @@ std::vector<cv::Mat> detector::get_sample(cv::Mat image, int pos_x, int pos_y, c
         cv::Mat tmp;
         alfeat[i].convertTo(tmp, CV_32F);
         tmp /= 255;
-        tmp.copyTo(feature.row(i));
+        alfeat[i].copyTo(feature.row(i));
     }
-    label = label.reshape(1, 1).t();
+    label = label.reshape(1, 1);
     std::vector<cv::Mat> ans;
 
 
@@ -136,15 +145,17 @@ void detector::train(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bo
     //std::cout<<"de"<<std::endl;
     std::vector<cv::Mat> samples = get_sample(image, pos_x, pos_y, window_sz);
     //std::cout<<samples[1]<<std::endl;
-    float posi = 0.8, nega = 0.3;
+    float posi = 0.5,  nega = 0.1;
     std::vector<cv::Mat> features;
     std::vector<int> labels;
+    int k = 0;
     for(int i = 0; i < samples[0].rows; i++)
     {
         if(samples[1].at<float>(0, i) > posi)
         {
             labels.push_back(1);
             features.push_back(samples[0].row(i).clone());
+            k++;
         }
         else if(samples[1].at<float>(0, i) < nega)
         {
@@ -152,18 +163,18 @@ void detector::train(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bo
             features.push_back(samples[0].row(i).clone());
         }
     }
-    cv::Mat feat(features.size(), features[0].cols, CV_32F, cv::Scalar::all(0)), labe(1, features.size(), CV_32S, cv::Scalar::all(0));
+    cv::Mat feat(features.size(), features[0].cols, CV_32F, cv::Scalar::all(0)), labe(features.size(), 1, CV_32F);
     for(int i = 0; i < features.size(); i++)
     {
         features[i].copyTo(feat.row(i));
-        labe.at<int>(0, i) = labels[i];
+        labe.at<float>(i, 0) = labels[i];
     }
     if(!online)
     {
         det->setType(cv::ml::SVM::C_SVC);
         det->setKernel(cv::ml::SVM::LINEAR);
-        det->setC(1);
-        cv::Ptr<cv::ml::TrainData> tData = cv::ml::TrainData::create(feat,cv::ml::ROW_SAMPLE, labe);
+        //det->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, 10, 1e-6));
+        cv::Ptr<cv::ml::TrainData> tData = cv::ml::TrainData::create(feat,cv::ml::ROW_SAMPLE, labels);
         det->train(tData);
         cv::Mat svidx;
         b = det->getDecisionFunction(0, w, svidx);
@@ -171,18 +182,23 @@ void detector::train(cv::Mat image, int pos_x, int pos_y, cv::Size window_sz, bo
         w.convertTo(w, CV_32F);
         w = -w*sv;
         w = w.t();
+        //std::cout<<b<<std::endl;
+        //std::cout<<feat.rows - cv::sum((((feat*w + b) > 0) & (labe > 0)) | (((feat*w + b) < 0) & (labe < 0)) )[0]/255<<std::endl;
     }
     else{
         for(int i = 0; i < feat.rows; i++)
         {
-            cv::Mat loss = 1 - labe.at<int>(0, i)*(feat.row(i) * w);
+            cv::Mat loss = 1 - labels[i]*(feat.row(i) * w + b);
+
             if(loss.at<float>(0, 0) > 0)
             {
+                //std::cout<<loss.at<float>(0, 0)<<std::endl;
                 cv::Mat cur = feat.row(i).clone();
-                cv::Mat update = cur.t()*labe.at<int>(0, i);
-                update *= loss.at<float>(0, 0)/(cv::sum(cur.mul(cur))[0] + 1);
+                cv::Mat update = cur.t()*labels[i];
+                update *= loss.at<float>(0, 0)/(cv::sum(cur.mul(cur))[0] + 1.f/2);
                 w += update;
             }
         }
+        //std::cout<<cv::sum((((feat*w + b) < 0) & (labe > 0)) )[0]/255<<std::endl;
     }
 }
